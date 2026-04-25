@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openenv-CarbonSchedulerEnv"
+version = "1.0.0"
+description = "Carbon-Aware AI Workload Scheduler — train LLMs to schedule AI jobs across global data centres to minimise carbon emissions"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv-core[core]>=0.2.2",
+]
+
+[project.scripts]
+server = "CarbonSchedulerEnv.server.app:main"
+
+[tool.setuptools]
+packages = ["CarbonSchedulerEnv", "CarbonSchedulerEnv.server"]
+package-dir = { "CarbonSchedulerEnv" = ".", "CarbonSchedulerEnv.server" = "server" }

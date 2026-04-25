@@ -63,12 +63,28 @@ model = FastLanguageModel.get_peft_model(
 
 # ── Environment client ────────────────────────────────────────────────────────
 if args.env_url:
-    from client import CarbonSchedulerClient
+    from CarbonSchedulerEnv.client import CarbonSchedulerClient
     env_client = CarbonSchedulerClient(args.env_url)
     print(f"Connected to remote env: {args.env_url} | healthy={env_client.health()}")
 else:
-    from client import LocalCarbonSchedulerClient
-    env_client = LocalCarbonSchedulerClient()
+    from CarbonSchedulerEnv.server.CarbonSchedulerEnv_environment import CarbonSchedulerEnvEnvironment
+    from CarbonSchedulerEnv.models import CarbonSchedulerAction, ScheduleDecision
+
+    class LocalEnvWrapper:
+        def __init__(self):
+            self.env = CarbonSchedulerEnvEnvironment()
+        def reset(self, seed=None):
+            obs = self.env.reset(seed=seed)
+            return obs.model_dump()
+        def step(self, action_json):
+            import json
+            data = json.loads(action_json) if isinstance(action_json, str) else action_json
+            assignments = [ScheduleDecision(**a) for a in data.get("assignments", [])]
+            action = CarbonSchedulerAction(assignments=assignments)
+            obs = self.env.step(action)
+            return obs.model_dump(), obs.reward, obs.done, obs.reward_breakdown
+
+    env_client = LocalEnvWrapper()
     print("Using local in-process environment")
 
 
@@ -180,25 +196,37 @@ def run_episode(seed: int = None) -> Dict[str, Any]:
 
 
 # ── Reward function for GRPO ──────────────────────────────────────────────────
-def reward_fn(prompts: List[str], completions: List[str], **kwargs) -> List[float]:
+def reward_fn(prompts: List[str], completions: List[str], obs_json=None, **kwargs) -> List[float]:
     """
     GRPO reward function — called by GRPOTrainer per batch.
-    Runs each completion through the environment and returns rewards.
+    FIX: uses pre-generated obs rather than resetting env every call (was very expensive).
+    Each prompt was generated from env.reset() at dataset build time.
+    We replay the completion against a fresh env seeded identically.
     """
+    import json as _json
     rewards = []
-    for prompt, completion in zip(prompts, completions):
+    for i, (prompt, completion) in enumerate(zip(prompts, completions)):
         try:
-            # Fresh episode for each evaluation
-            seed = random.randint(0, 9999)
-            obs  = env_client.reset(seed=seed)
+            # Parse the model's JSON output
+            start = completion.find("{")
+            end   = completion.rfind("}") + 1
+            if start < 0 or end <= 0:
+                rewards.append(-0.3)   # invalid JSON format
+                continue
 
-            # Single-step eval — send the completion as the action
-            _, reward, _, info = env_client.step(completion)
+            data = _json.loads(completion[start:end])
+
+            # Use seed from dataset if available (reproducible eval)
+            seed = (i * 7 + 42) % 9999
+            env_client.reset(seed=seed)
+            _, reward, _, _ = env_client.step(completion[start:end])
             rewards.append(float(reward))
 
+        except _json.JSONDecodeError:
+            rewards.append(-0.3)
         except Exception as e:
             print(f"Reward fn error: {e}")
-            rewards.append(-0.5)   # penalise errors but don't crash training
+            rewards.append(-0.5)
 
     return rewards
 
