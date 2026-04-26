@@ -1,19 +1,26 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "openenv-CarbonSchedulerEnv"
+name = "carbon-aware-scheduler-env"
 version = "1.0.0"
-description = "Carbon-Aware AI Workload Scheduler — train LLMs to schedule AI jobs across global data centres to minimise carbon emissions"
+description = "Carbon-Aware AI Workload Scheduler OpenEnv environment"
 requires-python = ">=3.10"
 dependencies = [
     "openenv-core[core]>=0.2.2",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0",
+    "requests>=2.31.0",
 ]
 
-[project.scripts]
-server = "CarbonSchedulerEnv.server.app:main"
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["server*"]
 
-[tool.setuptools]
-packages = ["CarbonSchedulerEnv", "CarbonSchedulerEnv.server"]
-package-dir = { "CarbonSchedulerEnv" = ".", "CarbonSchedulerEnv.server" = "server" }
+# CRITICAL: tells uv NOT to try building/installing this repo as a Python
+# package. It is a runnable app, not a library. Without this, uv sync
+# --no-editable fails because it can't find the installable package source.
+[tool.uv]
+package = false

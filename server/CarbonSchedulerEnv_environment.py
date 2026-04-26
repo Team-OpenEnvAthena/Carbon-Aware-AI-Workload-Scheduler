@@ -36,25 +36,17 @@ from uuid import uuid4
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import State
 
-try:
-    from ..models import CarbonSchedulerAction, CarbonSchedulerObservation, ScheduleDecision
-except ImportError:
-    from models import CarbonSchedulerAction, CarbonSchedulerObservation, ScheduleDecision
-
-try:
-    from .data_models import Job, DataCenter, InternalAssignment, Priority
-    from .carbon_data import (
-        BASE_PROFILES, get_carbon_now, get_carbon_forecast,
-        get_renewable_pct, naive_carbon_for_job,
-    )
-    from .rewards import compute_step_reward, compute_episode_reward
-except ImportError:
-    from data_models import Job, DataCenter, InternalAssignment, Priority
-    from carbon_data import (
-        BASE_PROFILES, get_carbon_now, get_carbon_forecast,
-        get_renewable_pct, naive_carbon_for_job,
-    )
-    from rewards import compute_step_reward, compute_episode_reward
+# Absolute imports only — server is the top-level package when uvicorn
+# runs `server.app:app`, so relative imports like `from ..models` raise:
+#   ImportError: attempted relative import beyond top-level package
+# PYTHONPATH=/app/env (set in Dockerfile) makes all of these resolvable.
+from models import CarbonSchedulerAction, CarbonSchedulerObservation, ScheduleDecision
+from server.data_models import Job, DataCenter, InternalAssignment, Priority
+from server.carbon_data import (
+    BASE_PROFILES, get_carbon_now, get_carbon_forecast,
+    get_renewable_pct, naive_carbon_for_job,
+)
+from server.rewards import compute_step_reward, compute_episode_reward
 
 
 # ── Curriculum config ──────────────────────────────────────────────────────────
@@ -83,7 +75,7 @@ CURRICULUM = {
     },
 }
 
-STAGE_REWARD_THRESHOLD = 0.55   # avg reward to advance stage
+STAGE_REWARD_THRESHOLD = 0.70   # FIX [5]: was 0.55 — barely above naive baseline   # avg reward to advance stage
 STAGE_EPISODES_NEEDED  = 5      # consecutive episodes above threshold
 
 # ── Job templates (realistic AI workloads) ─────────────────────────────────────

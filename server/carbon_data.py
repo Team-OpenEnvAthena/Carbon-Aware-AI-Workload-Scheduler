@@ -119,13 +119,40 @@ def naive_carbon_for_job(
     energy_kwh: float,
     current_hour: int,
     noise_seed: int = 0,
+    available_regions: List[str] = None,
 ) -> float:
     """
-    Baseline: run job right now in the highest-traffic (worst) region.
-    Used to compute carbon savings delta.
+    FIX: Baseline is now 'run immediately in the best available region right now'.
+
+    Previously used Mumbai (worst region, 680 gCO2/kWh) which made carbon_score
+    trivially easy — even Virginia (360 gCO2/kWh) scored 47% efficiency without
+    learning anything useful.
+
+    Now the baseline is the true opportunity cost: what you would emit if you
+    picked the cleanest region available right now but did zero temporal planning.
+    The agent must beat THIS to prove it has learned to read forecasts and time
+    jobs to cleaner future windows.
     """
-    worst_region = "ap-south-1"
-    ci = get_carbon_now(worst_region, current_hour, noise_seed)
+    if available_regions is None:
+        available_regions = list(BASE_PROFILES.keys())
+
+    best_ci = min(
+        get_carbon_now(region, current_hour, noise_seed)
+        for region in available_regions
+    )
+    return energy_kwh * best_ci
+
+
+def worst_carbon_for_job(
+    energy_kwh: float,
+    current_hour: int,
+    noise_seed: int = 0,
+) -> float:
+    """
+    Worst-case baseline (Mumbai) — kept for episode summary context logging only.
+    Not used in the reward function.
+    """
+    ci = get_carbon_now("ap-south-1", current_hour, noise_seed)
     return energy_kwh * ci
 
 
