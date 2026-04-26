@@ -43,6 +43,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Make sure server package is importable
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
+ENV ENABLE_WEB_INTERFACE="true"
 
 # HuggingFace Spaces: must listen on 7860
 EXPOSE 7860
